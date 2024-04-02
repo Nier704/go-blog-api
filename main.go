@@ -17,7 +17,7 @@ func main() {
 
 	r.Route("/messages", messages.Router)
 
-	http.ListenAndServe(":"+os.Getenv("PORT"), handlers.CORS(
+	http.ListenAndServe("0.0.0.0:"+os.Getenv("PORT"), handlers.CORS(
 		handlers.AllowedOrigins([]string{"*"}),
 		handlers.AllowedMethods([]string{"GET", "POST", "PUT", "DELETE", "OPTIONS"}),
 		handlers.AllowedHeaders([]string{"X-Requested-With", "Content-Type", "Authorization"}),
