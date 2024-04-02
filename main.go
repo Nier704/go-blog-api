@@ -8,6 +8,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/gorilla/handlers"
+	"github.com/joho/godotenv"
 )
 
 func main() {
@@ -17,7 +18,10 @@ func main() {
 
 	r.Route("/messages", messages.Router)
 
-	http.ListenAndServe(":"+os.Getenv("PORT"), handlers.CORS(
+	godotenv.Load()
+	port := os.Getenv("PORT")
+
+	http.ListenAndServe(":"+port, handlers.CORS(
 		handlers.AllowedOrigins([]string{"*"}),
 		handlers.AllowedMethods([]string{"GET", "POST", "PUT", "DELETE", "OPTIONS"}),
 		handlers.AllowedHeaders([]string{"X-Requested-With", "Content-Type", "Authorization"}),
