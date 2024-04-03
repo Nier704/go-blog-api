@@ -1,36 +1,40 @@
 package messages
 
 import (
-	"database/sql"
-	"encoding/json"
+	"context"
 	"fmt"
-	"log"
 	"net/http"
+	"os"
+	"time"
 
 	"github.com/go-chi/chi/v5"
-	_ "github.com/go-sql-driver/mysql"
+	"github.com/joho/godotenv"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type Message struct {
-	Id     int    `json:"id"`
-	Author string `json:"author"`
-	Text   string `json:"text"`
-	Date   string `json:"date"`
+	Id     primitive.ObjectID `bson:"_id,omitempty"`
+	Author string             `bson:"author"`
+	Text   string             `bson:"text"`
+	Date   string             `bson:"date"`
 }
 
 type MessageDTO struct {
-	Author string `json:"author"`
-	Text   string `json:"text"`
-	Date   string `json:"date"`
+	Author string `bson:"author"`
+	Text   string `bson:"text"`
+	Date   string `bson:"date"`
 }
 
 type MessageList []Message
 
-var db *sql.DB
+var db *mongo.Database
 
 func Router(r chi.Router) {
 	if err := openDBConn(); err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
 
 	r.Get("/", allMessages)
@@ -38,60 +42,49 @@ func Router(r chi.Router) {
 }
 
 func allMessages(w http.ResponseWriter, r *http.Request) {
-	results, err := db.Query("SELECT * FROM message")
+	coll := db.Collection("messages")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	cursor, err := coll.Find(ctx, bson.M{})
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
+	defer cursor.Close(ctx)
 
-	var msgs MessageList
-
-	for results.Next() {
-		var msg Message
-		if err = results.Scan(&msg.Id, &msg.Author, &msg.Text, &msg.Date); err != nil {
-			log.Fatal(err)
+	for cursor.Next(ctx) {
+		var msg bson.M
+		if err = cursor.Decode(&msg); err != nil {
+			panic(err)
 		}
-		msgs = append(msgs, msg)
+		fmt.Println(msg)
 	}
-
-	json.NewEncoder(w).Encode(msgs)
 }
 
 func sendMessage(w http.ResponseWriter, r *http.Request) {
-	var new_msg MessageDTO
-	err := json.NewDecoder(r.Body).Decode(&new_msg)
-	if err != nil {
-		log.Fatal(err)
-	}
 
-	_, err = db.Exec(fmt.Sprintf("INSERT INTO message (author, text, date) VALUES ('%s', '%s', '%s')", new_msg.Author, new_msg.Text, new_msg.Date))
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	json.NewEncoder(w).Encode(new_msg)
 }
 
 func openDBConn() (err error) {
-	db, err = sql.Open("mysql", "root:srlucky123@tcp(127.0.0.1:3306)/")
+	godotenv.Load()
+	db_password := os.Getenv("DB_PASSWORD")
+
+	db_url := fmt.Sprintf("mongodb+srv://lorecode12:%s@cluster0.qw8e8tb.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0", db_password)
+
+	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI(db_url))
 	if err != nil {
 		return err
 	}
 
-	_, err = db.Exec("CREATE DATABASE IF NOT EXISTS blogdb")
+	err = client.Ping(context.Background(), nil)
 	if err != nil {
 		return err
 	}
 
-	_, err = db.Exec("USE blogdb")
-	if err != nil {
-		return err
-	}
-
-	_, err = db.Exec("CREATE TABLE IF NOT EXISTS message (id INTEGER PRIMARY KEY AUTO_INCREMENT, author VARCHAR(255) NOT NULL, text VARCHAR(255) NOT NULL, date VARCHAR(255) NOT NULL)")
-	if err != nil {
-		return err
-	}
-
+	db = client.Database("blog-go")
 	fmt.Println("database connection established")
 	return nil
 }
