@@ -21,7 +21,11 @@ func main() {
 	godotenv.Load()
 	port := os.Getenv("PORT")
 
-	http.ListenAndServe(":"+port, handlers.CORS(
+	if port == "" {
+		port = "8080"
+	}
+
+	http.ListenAndServe("0.0.0.0:"+port, handlers.CORS(
 		handlers.AllowedOrigins([]string{"*"}),
 		handlers.AllowedMethods([]string{"GET", "POST", "PUT", "DELETE", "OPTIONS"}),
 		handlers.AllowedHeaders([]string{"X-Requested-With", "Content-Type", "Authorization"}),
