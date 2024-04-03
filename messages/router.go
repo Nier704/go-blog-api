@@ -2,6 +2,7 @@ package messages
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -53,13 +54,21 @@ func allMessages(w http.ResponseWriter, r *http.Request) {
 	}
 	defer cursor.Close(ctx)
 
+	var msg_list []MessageDTO
+
 	for cursor.Next(ctx) {
-		var msg bson.M
+		var msg Message
+		var msgDTO MessageDTO
 		if err = cursor.Decode(&msg); err != nil {
 			panic(err)
 		}
-		fmt.Println(msg)
+		msgDTO.Author = msg.Author
+		msgDTO.Text = msg.Text
+		msgDTO.Date = msg.Date
+		msg_list = append(msg_list, msgDTO)
 	}
+
+	json.NewEncoder(w).Encode(msg_list)
 }
 
 func sendMessage(w http.ResponseWriter, r *http.Request) {
